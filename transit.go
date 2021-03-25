@@ -11,6 +11,7 @@ import (
 type transitclient struct {
 	vaultaddr string
 	token     string
+	keyname   string
 	namespace string
 }
 
@@ -29,7 +30,7 @@ func (c *transitclient) Decrypt(a string) (string, error) {
 	b := bytes.NewBuffer(jsondata)
 
 	client := http.Client{}
-	req, err := http.NewRequest("POST", c.vaultaddr+"v1/transit/decrypt/my-key", b)
+	req, err := http.NewRequest("POST", c.vaultaddr+"v1/transit/decrypt/"+c.keyname, b)
 	if err != nil {
 		return "", err
 	}
@@ -83,7 +84,7 @@ func (c *transitclient) Encrypt(a string) (string, int, error) {
 	b := bytes.NewBuffer(jsondata)
 
 	client := http.Client{}
-	req, err := http.NewRequest("POST", c.vaultaddr+"v1/transit/encrypt/my-key", b)
+	req, err := http.NewRequest("POST", c.vaultaddr+"v1/transit/encrypt/"+c.keyname, b)
 	if err != nil {
 		return "", 0, err
 	}
