@@ -1,4 +1,4 @@
-package transit
+package vaultlib
 
 import (
 	"bytes"
