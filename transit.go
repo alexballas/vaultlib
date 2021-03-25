@@ -8,14 +8,14 @@ import (
 	"net/http"
 )
 
-type client struct {
+type transitclient struct {
 	vaultaddr string
 	token     string
 	namespace string
 }
 
 // Decrypt text input
-func (c *client) Decrypt(a string) (string, error) {
+func (c *transitclient) Decrypt(a string) (string, error) {
 	jsonin := &struct {
 		Ciphertext string `json:"ciphertext"`
 	}{
@@ -69,7 +69,7 @@ func (c *client) Decrypt(a string) (string, error) {
 }
 
 // Encrypt text input.
-func (c *client) Encrypt(a string) (string, int, error) {
+func (c *transitclient) Encrypt(a string) (string, int, error) {
 	sEnc := base64.StdEncoding.EncodeToString([]byte(a))
 	jsonin := &struct {
 		Plaintext string `json:"plaintext"`
@@ -124,8 +124,8 @@ func (c *client) Encrypt(a string) (string, int, error) {
 }
 
 // NewTransitClient - Generate new transit client.
-func NewTransitClient(addr, token, namespace string) *client {
-	return &client{
+func NewTransitClient(addr, token, namespace string) *transitclient {
+	return &transitclient{
 		vaultaddr: addr,
 		token:     token,
 		namespace: namespace,
