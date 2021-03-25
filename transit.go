@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 )
@@ -141,11 +140,10 @@ func (c *transitclient) Rotate() error {
 	if err != nil {
 		return err
 	}
-	body, err := io.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(body))
 	return nil
 }
 
