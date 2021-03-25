@@ -125,10 +125,11 @@ func (c *transitclient) Encrypt(a string) (string, int, error) {
 }
 
 // NewTransitClient - Generate new transit client.
-func NewTransitClient(addr, token, namespace string) *transitclient {
+func NewTransitClient(addr, token, keyname, namespace string) *transitclient {
 	return &transitclient{
 		vaultaddr: addr,
 		token:     token,
+		keyname:   keyname,
 		namespace: namespace,
 	}
 }
