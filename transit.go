@@ -258,8 +258,11 @@ func (c *transitclient) Config(mindecrypion, minencryption int) error {
 		"X-Vault-Namespace": {c.namespace},
 	}
 	req.Header = headers
-	_, err = client.Do(req)
 
+	_, err = client.Do(req)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
