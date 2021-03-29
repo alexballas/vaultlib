@@ -27,7 +27,7 @@ func main() {
 	check(err)
 
 	//transitclient.Rotate()
-	fmt.Printf("Text     %s\n", text)
+	fmt.Printf("Text       %s\n", text)
 	fmt.Printf("Encrypted: %s\n", cipher)
 	fmt.Printf("Decrypted: %s\n", dec)
 	//fmt.Println(transitclient.Config(6, 6))
