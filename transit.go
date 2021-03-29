@@ -14,7 +14,7 @@ type transitclient struct {
 
 // Decrypt text input
 func (c *transitclient) Decrypt(a string) (string, error) {
-	r := c.client.NewRequest("POST", "v1/transit/decrypt/"+c.keyname)
+	r := c.client.NewRequest("POST", "/v1/transit/decrypt/"+c.keyname)
 
 	reqbody := map[string]string{"ciphertext": a}
 
@@ -46,7 +46,7 @@ func (c *transitclient) Decrypt(a string) (string, error) {
 // Encrypt text input.
 func (c *transitclient) Encrypt(a string) (string, int, error) {
 	sEnc := base64.StdEncoding.EncodeToString([]byte(a))
-	r := c.client.NewRequest("POST", "v1/transit/encrypt/"+c.keyname)
+	r := c.client.NewRequest("POST", "/v1/transit/encrypt/"+c.keyname)
 
 	reqbody := map[string]string{"plaintext": sEnc}
 
@@ -76,7 +76,7 @@ func (c *transitclient) Encrypt(a string) (string, int, error) {
 
 // Rotate text input.
 func (c *transitclient) Rotate() error {
-	r := c.client.NewRequest("POST", "v1/transit/keys/"+c.keyname+"/rotate")
+	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.keyname+"/rotate")
 	resp, err := c.client.RawRequest(r)
 	if err != nil {
 		return err
@@ -88,7 +88,7 @@ func (c *transitclient) Rotate() error {
 
 // Rewrap cipher input
 func (c *transitclient) Rewrap(a string) (string, int, error) {
-	r := c.client.NewRequest("POST", "v1/transit/rewrap/"+c.keyname)
+	r := c.client.NewRequest("POST", "/v1/transit/rewrap/"+c.keyname)
 
 	reqbody := map[string]string{"ciphertext": a}
 
@@ -118,7 +118,7 @@ func (c *transitclient) Rewrap(a string) (string, int, error) {
 
 // Trim key
 func (c *transitclient) Trim(d int) error {
-	r := c.client.NewRequest("POST", "v1/transit/keys/"+c.keyname+"/trim")
+	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.keyname+"/trim")
 
 	reqbody := map[string]int{"min_available_version": d}
 
@@ -137,7 +137,7 @@ func (c *transitclient) Trim(d int) error {
 
 // Config key - Minimum Decryption version - Minimum Encryption version
 func (c *transitclient) Config(mindecrypion, minencryption int) error {
-	r := c.client.NewRequest("POST", "v1/transit/keys/"+c.keyname+"/config")
+	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.keyname+"/config")
 
 	reqbody := map[string]int{
 		"min_decryption_version": mindecrypion,
