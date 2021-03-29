@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/alexballas/vaultlib"
@@ -14,9 +15,10 @@ var (
 )
 
 func main() {
-	text := "Encode me please!"
+	text := "Encrypt me please!"
 
-	transitclient := vaultlib.NewTransitClient(vaultaddr, token, "my-key", namespace)
+	transitclient, err := vaultlib.NewTransitClient(vaultaddr, token, "my-key", namespace)
+	check(err)
 
 	cipher, _, err := transitclient.Encrypt(text)
 	check(err)
@@ -24,13 +26,16 @@ func main() {
 	dec, err := transitclient.Decrypt(cipher)
 	check(err)
 
+	//transitclient.Rotate()
 	fmt.Printf("Text     %s\n", text)
-	fmt.Printf("Encoded: %s\n", cipher)
-	fmt.Printf("Decoded: %s\n", dec)
+	fmt.Printf("Encrypted: %s\n", cipher)
+	fmt.Printf("Decrypted: %s\n", dec)
+	//fmt.Println(transitclient.Config(6, 6))
+	//fmt.Println(transitclient.Trim(6))
 }
 
 func check(err error) {
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
