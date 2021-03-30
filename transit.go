@@ -2,6 +2,7 @@ package vaultlib
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 
 	"github.com/hashicorp/vault/api"
@@ -33,25 +34,19 @@ func (c *transitclient) Decrypt(a string) (cipher string, err error) {
 	}
 	defer resp.Body.Close()
 
-	decryptreply := &struct {
-		Data struct {
-			Plaintext string `json:"plaintext"`
-		} `json:"data"`
-	}{}
-
+	decryptreply := &api.Secret{}
 	if err := jsonutil.DecodeJSONFromReader(resp.Body, decryptreply); err != nil {
 		return "", err
 	}
-
-	sDec, _ := base64.StdEncoding.DecodeString(decryptreply.Data.Plaintext)
+	sDec, _ := base64.StdEncoding.DecodeString(decryptreply.Data["plaintext"].(string))
 
 	return string(sDec), nil
 }
 
 // Encrypt text input.
-func (c *transitclient) Encrypt(a string) (text string, version int, err error) {
+func (c *transitclient) Encrypt(a string) (text string, version json.Number, err error) {
 	if c.keyname == "" {
-		return "", 0, errors.New("no key provided")
+		return "", "", errors.New("no key provided")
 	}
 
 	sEnc := base64.StdEncoding.EncodeToString([]byte(a))
@@ -60,27 +55,22 @@ func (c *transitclient) Encrypt(a string) (text string, version int, err error) 
 	reqbody := map[string]string{"plaintext": sEnc}
 
 	if err := r.SetJSONBody(reqbody); err != nil {
-		return "", 0, err
+		return "", "", err
 	}
 
 	resp, err := c.client.RawRequest(r)
 	if err != nil {
-		return "", 0, err
+		return "", "", err
 	}
 	defer resp.Body.Close()
 
-	encryptreply := &struct {
-		Data struct {
-			Ciphertext string `json:"ciphertext"`
-			KeyVersion int    `json:"key_version"`
-		} `json:"data"`
-	}{}
+	encreply := &api.Secret{}
 
-	if err := jsonutil.DecodeJSONFromReader(resp.Body, encryptreply); err != nil {
-		return "", 0, err
+	if err := jsonutil.DecodeJSONFromReader(resp.Body, encreply); err != nil {
+		return "", "", err
 	}
 
-	return encryptreply.Data.Ciphertext, encryptreply.Data.KeyVersion, nil
+	return encreply.Data["ciphertext"].(string), encreply.Data["key_version"].(json.Number), nil
 }
 
 // Rotate text input.
@@ -100,9 +90,9 @@ func (c *transitclient) Rotate() (err error) {
 }
 
 // Rewrap cipher input
-func (c *transitclient) Rewrap(a string) (cipher string, version int, err error) {
+func (c *transitclient) Rewrap(a string) (cipher string, version json.Number, err error) {
 	if c.keyname == "" {
-		return "", 0, errors.New("no key provided")
+		return "", "", errors.New("no key provided")
 	}
 
 	r := c.client.NewRequest("POST", "/v1/transit/rewrap/"+c.keyname)
@@ -110,27 +100,22 @@ func (c *transitclient) Rewrap(a string) (cipher string, version int, err error)
 	reqbody := map[string]string{"ciphertext": a}
 
 	if err := r.SetJSONBody(reqbody); err != nil {
-		return "", 0, err
+		return "", "", err
 	}
 
 	resp, err := c.client.RawRequest(r)
 	if err != nil {
-		return "", 0, err
+		return "", "", err
 	}
 	defer resp.Body.Close()
 
-	rewrapreply := &struct {
-		Data struct {
-			Ciphertext string `json:"ciphertext"`
-			KeyVersion int    `json:"key_version"`
-		} `json:"data"`
-	}{}
+	rewrapreply := &api.Secret{}
 
 	if err := jsonutil.DecodeJSONFromReader(resp.Body, rewrapreply); err != nil {
-		return "", 0, err
+		return "", "", err
 	}
 
-	return rewrapreply.Data.Ciphertext, rewrapreply.Data.KeyVersion, nil
+	return rewrapreply.Data["ciphertext"].(string), rewrapreply.Data["key_version"].(json.Number), nil
 }
 
 // Trim key
@@ -157,7 +142,7 @@ func (c *transitclient) Trim(d int) (err error) {
 }
 
 // Listkeys
-func (c *transitclient) Listkeys() (keys []string, err error) {
+func (c *transitclient) Listkeys() (keys []interface{}, err error) {
 	r := c.client.NewRequest("LIST", "/v1/transit/keys")
 
 	resp, err := c.client.RawRequest(r)
@@ -166,16 +151,12 @@ func (c *transitclient) Listkeys() (keys []string, err error) {
 	}
 	defer resp.Body.Close()
 
-	listreply := &struct {
-		Data struct {
-			Keys []string `json:"keys"`
-		} `json:"data"`
-	}{}
+	listreply := &api.Secret{}
 	if err := jsonutil.DecodeJSONFromReader(resp.Body, listreply); err != nil {
 		return nil, err
 	}
 
-	return listreply.Data.Keys, nil
+	return listreply.Data["keys"].([]interface{}), nil
 }
 
 // Config key - Minimum Decryption version - Minimum Encryption version

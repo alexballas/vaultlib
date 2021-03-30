@@ -22,7 +22,7 @@ func main() {
 	listk, err := transitclient.Listkeys()
 	check(err)
 
-	cipher, _, err := transitclient.Encrypt(text)
+	cipher, aaa, err := transitclient.Encrypt(text)
 	check(err)
 
 	dec, err := transitclient.Decrypt(cipher)
@@ -32,7 +32,7 @@ func main() {
 
 	fmt.Printf("All Keys   %s\n", listk)
 	fmt.Printf("Text       %s\n", text)
-	fmt.Printf("Encrypted: %s\n", cipher)
+	fmt.Printf("Encrypted: %s %s\n", cipher, aaa)
 	fmt.Printf("Decrypted: %s\n", dec)
 
 	//fmt.Println(transitclient.Config(6, 6))
