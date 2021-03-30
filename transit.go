@@ -10,17 +10,17 @@ import (
 )
 
 type transitclient struct {
-	keyname string
-	client  *api.Client
+	Key    string
+	client *api.Client
 }
 
-// Decrypt text input
+// Decrypt text input.
 func (c *transitclient) Decrypt(a string) (cipher string, err error) {
-	if c.keyname == "" {
+	if c.Key == "" {
 		return "", errors.New("no key provided")
 	}
 
-	r := c.client.NewRequest("POST", "/v1/transit/decrypt/"+c.keyname)
+	r := c.client.NewRequest("POST", "/v1/transit/decrypt/"+c.Key)
 
 	reqbody := map[string]string{"ciphertext": a}
 
@@ -45,12 +45,12 @@ func (c *transitclient) Decrypt(a string) (cipher string, err error) {
 
 // Encrypt text input.
 func (c *transitclient) Encrypt(a string) (text string, version json.Number, err error) {
-	if c.keyname == "" {
+	if c.Key == "" {
 		return "", "", errors.New("no key provided")
 	}
 
 	sEnc := base64.StdEncoding.EncodeToString([]byte(a))
-	r := c.client.NewRequest("POST", "/v1/transit/encrypt/"+c.keyname)
+	r := c.client.NewRequest("POST", "/v1/transit/encrypt/"+c.Key)
 
 	reqbody := map[string]string{"plaintext": sEnc}
 
@@ -73,13 +73,13 @@ func (c *transitclient) Encrypt(a string) (text string, version json.Number, err
 	return encreply.Data["ciphertext"].(string), encreply.Data["key_version"].(json.Number), nil
 }
 
-// Rotate text input.
+// Rotate key.
 func (c *transitclient) Rotate() (err error) {
-	if c.keyname == "" {
+	if c.Key == "" {
 		return errors.New("no key provided")
 	}
 
-	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.keyname+"/rotate")
+	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.Key+"/rotate")
 	resp, err := c.client.RawRequest(r)
 	if err != nil {
 		return err
@@ -89,13 +89,13 @@ func (c *transitclient) Rotate() (err error) {
 	return nil
 }
 
-// Rewrap cipher input
+// Rewrap cipher input.
 func (c *transitclient) Rewrap(a string) (cipher string, version json.Number, err error) {
-	if c.keyname == "" {
+	if c.Key == "" {
 		return "", "", errors.New("no key provided")
 	}
 
-	r := c.client.NewRequest("POST", "/v1/transit/rewrap/"+c.keyname)
+	r := c.client.NewRequest("POST", "/v1/transit/rewrap/"+c.Key)
 
 	reqbody := map[string]string{"ciphertext": a}
 
@@ -118,13 +118,13 @@ func (c *transitclient) Rewrap(a string) (cipher string, version json.Number, er
 	return rewrapreply.Data["ciphertext"].(string), rewrapreply.Data["key_version"].(json.Number), nil
 }
 
-// Trim key
+// Trim key.
 func (c *transitclient) Trim(d int) (err error) {
-	if c.keyname == "" {
+	if c.Key == "" {
 		return errors.New("no key provided")
 	}
 
-	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.keyname+"/trim")
+	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.Key+"/trim")
 
 	reqbody := map[string]int{"min_available_version": d}
 
@@ -159,12 +159,12 @@ func (c *transitclient) Listkeys() (keys []interface{}, err error) {
 	return listreply.Data["keys"].([]interface{}), nil
 }
 
-// Config key - Minimum Decryption version - Minimum Encryption version
+// Config key - Minimum Decryption version - Minimum Encryption version.
 func (c *transitclient) Config(mindecrypion, minencryption int) (err error) {
-	if c.keyname == "" {
+	if c.Key == "" {
 		return errors.New("no key provided")
 	}
-	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.keyname+"/config")
+	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.Key+"/config")
 
 	reqbody := map[string]int{
 		"min_decryption_version": mindecrypion,
@@ -183,7 +183,7 @@ func (c *transitclient) Config(mindecrypion, minencryption int) (err error) {
 	return nil
 }
 
-// NewTransitClient - Generate new transit client.
+// Newtransitclient - Generate new transit client.
 func NewTransitClient(addr, token, key, namespace string) (*transitclient, error) {
 	newclient, err := newclient(addr, namespace, token)
 	if err != nil {
@@ -191,7 +191,7 @@ func NewTransitClient(addr, token, key, namespace string) (*transitclient, error
 	}
 
 	return &transitclient{
-		keyname: key,
-		client:  newclient,
+		Key:    key,
+		client: newclient,
 	}, nil
 }
