@@ -2,6 +2,7 @@ package vaultlib
 
 import (
 	"encoding/base64"
+	"errors"
 
 	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/sdk/helper/jsonutil"
@@ -13,7 +14,11 @@ type transitclient struct {
 }
 
 // Decrypt text input
-func (c *transitclient) Decrypt(a string) (string, error) {
+func (c *transitclient) Decrypt(a string) (cipher string, err error) {
+	if c.keyname == "" {
+		return "", errors.New("no key provided")
+	}
+
 	r := c.client.NewRequest("POST", "/v1/transit/decrypt/"+c.keyname)
 
 	reqbody := map[string]string{"ciphertext": a}
@@ -44,7 +49,11 @@ func (c *transitclient) Decrypt(a string) (string, error) {
 }
 
 // Encrypt text input.
-func (c *transitclient) Encrypt(a string) (string, int, error) {
+func (c *transitclient) Encrypt(a string) (text string, version int, err error) {
+	if c.keyname == "" {
+		return "", 0, errors.New("no key provided")
+	}
+
 	sEnc := base64.StdEncoding.EncodeToString([]byte(a))
 	r := c.client.NewRequest("POST", "/v1/transit/encrypt/"+c.keyname)
 
@@ -75,7 +84,11 @@ func (c *transitclient) Encrypt(a string) (string, int, error) {
 }
 
 // Rotate text input.
-func (c *transitclient) Rotate() error {
+func (c *transitclient) Rotate() (err error) {
+	if c.keyname == "" {
+		return errors.New("no key provided")
+	}
+
 	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.keyname+"/rotate")
 	resp, err := c.client.RawRequest(r)
 	if err != nil {
@@ -87,7 +100,11 @@ func (c *transitclient) Rotate() error {
 }
 
 // Rewrap cipher input
-func (c *transitclient) Rewrap(a string) (string, int, error) {
+func (c *transitclient) Rewrap(a string) (cipher string, version int, err error) {
+	if c.keyname == "" {
+		return "", 0, errors.New("no key provided")
+	}
+
 	r := c.client.NewRequest("POST", "/v1/transit/rewrap/"+c.keyname)
 
 	reqbody := map[string]string{"ciphertext": a}
@@ -117,7 +134,11 @@ func (c *transitclient) Rewrap(a string) (string, int, error) {
 }
 
 // Trim key
-func (c *transitclient) Trim(d int) error {
+func (c *transitclient) Trim(d int) (err error) {
+	if c.keyname == "" {
+		return errors.New("no key provided")
+	}
+
 	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.keyname+"/trim")
 
 	reqbody := map[string]int{"min_available_version": d}
@@ -135,8 +156,33 @@ func (c *transitclient) Trim(d int) error {
 	return nil
 }
 
+// Listkeys
+func (c *transitclient) Listkeys() (keys []string, err error) {
+	r := c.client.NewRequest("LIST", "/v1/transit/keys")
+
+	resp, err := c.client.RawRequest(r)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	listreply := &struct {
+		Data struct {
+			Keys []string `json:"keys"`
+		} `json:"data"`
+	}{}
+	if err := jsonutil.DecodeJSONFromReader(resp.Body, listreply); err != nil {
+		return nil, err
+	}
+
+	return listreply.Data.Keys, nil
+}
+
 // Config key - Minimum Decryption version - Minimum Encryption version
-func (c *transitclient) Config(mindecrypion, minencryption int) error {
+func (c *transitclient) Config(mindecrypion, minencryption int) (err error) {
+	if c.keyname == "" {
+		return errors.New("no key provided")
+	}
 	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.keyname+"/config")
 
 	reqbody := map[string]int{
@@ -157,14 +203,14 @@ func (c *transitclient) Config(mindecrypion, minencryption int) error {
 }
 
 // NewTransitClient - Generate new transit client.
-func NewTransitClient(addr, token, keyname, namespace string) (*transitclient, error) {
+func NewTransitClient(addr, token, key, namespace string) (*transitclient, error) {
 	newclient, err := newclient(addr, namespace, token)
 	if err != nil {
 		return nil, err
 	}
 
 	return &transitclient{
-		keyname: keyname,
+		keyname: key,
 		client:  newclient,
 	}, nil
 }
