@@ -23,15 +23,31 @@ func main() {
 	dec, err := transitclient.Decrypt(cipher)
 	check(err)
 
+	info, err := transitclient.Read()
+	check(err)
+
+	fmt.Printf("Deletion allowed for %q: %v\n", transitclient.Key, info.Data["deletion_allowed"].(bool))
+
 	//transitclient.Rotate()
 
-	fmt.Printf("All Keys   %s\n", listk)
-	fmt.Printf("Text       %s\n", text)
+	fmt.Printf("All Keys: %s\n", listk)
+	fmt.Printf("Text: %s\n", text)
 	fmt.Printf("Encrypted: %s \\ Version: %s\n", cipher, version)
 	fmt.Printf("Decrypted: %s\n", dec)
 
-	//fmt.Println(transitclient.Config(6, 6))
-	//fmt.Println(transitclient.Trim(6))
+	fmt.Println(transitclient.Config(1, 1, true, true, true))
+	//transitclient.Trim(1)
+
+	backup, err := transitclient.Backup()
+	check(err)
+	fmt.Println(backup)
+
+	err = transitclient.Delete()
+	check(err)
+
+	err = transitclient.Restore(backup)
+	check(err)
+
 }
 
 func check(err error) {

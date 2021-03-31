@@ -14,7 +14,8 @@ type transitclient struct {
 	client *api.Client
 }
 
-// Decrypt text input.
+// Decrypt the provided ciphertext using the named key.
+// https://www.vaultproject.io/api/secret/transit#decrypt-data
 func (c *transitclient) Decrypt(a string) (cipher string, err error) {
 	if c.Key == "" {
 		return "", errors.New("no key provided")
@@ -34,16 +35,17 @@ func (c *transitclient) Decrypt(a string) (cipher string, err error) {
 	}
 	defer resp.Body.Close()
 
-	decryptreply := &api.Secret{}
-	if err := jsonutil.DecodeJSONFromReader(resp.Body, decryptreply); err != nil {
+	reply := &api.Secret{}
+	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
 		return "", err
 	}
-	sDec, _ := base64.StdEncoding.DecodeString(decryptreply.Data["plaintext"].(string))
+	sDec, _ := base64.StdEncoding.DecodeString(reply.Data["plaintext"].(string))
 
 	return string(sDec), nil
 }
 
-// Encrypt text input.
+// Encrypt the provided plaintext using the named key.
+// https://www.vaultproject.io/api/secret/transit#encrypt-data
 func (c *transitclient) Encrypt(a string) (text string, version json.Number, err error) {
 	if c.Key == "" {
 		return "", "", errors.New("no key provided")
@@ -64,16 +66,19 @@ func (c *transitclient) Encrypt(a string) (text string, version json.Number, err
 	}
 	defer resp.Body.Close()
 
-	encreply := &api.Secret{}
+	reply := &api.Secret{}
 
-	if err := jsonutil.DecodeJSONFromReader(resp.Body, encreply); err != nil {
+	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
 		return "", "", err
 	}
 
-	return encreply.Data["ciphertext"].(string), encreply.Data["key_version"].(json.Number), nil
+	return reply.Data["ciphertext"].(string), reply.Data["key_version"].(json.Number), nil
 }
 
-// Rotate key.
+// Rotate the version of the named key.
+// After rotation, new plaintext requests will be  encrypted with the
+// new version of the key.
+// https://www.vaultproject.io/api/secret/transit#rotate-key
 func (c *transitclient) Rotate() (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
@@ -89,7 +94,10 @@ func (c *transitclient) Rotate() (err error) {
 	return nil
 }
 
-// Rewrap cipher input.
+// Rewrap  the provided ciphertext using the latest version of the named key.
+// Because this never returns plaintext, it is possible to delegate this
+// functionality to untrusted users or scripts..
+// https://www.vaultproject.io/api/secret/transit#rewrap-data
 func (c *transitclient) Rewrap(a string) (cipher string, version json.Number, err error) {
 	if c.Key == "" {
 		return "", "", errors.New("no key provided")
@@ -109,16 +117,18 @@ func (c *transitclient) Rewrap(a string) (cipher string, version json.Number, er
 	}
 	defer resp.Body.Close()
 
-	rewrapreply := &api.Secret{}
+	reply := &api.Secret{}
 
-	if err := jsonutil.DecodeJSONFromReader(resp.Body, rewrapreply); err != nil {
+	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
 		return "", "", err
 	}
 
-	return rewrapreply.Data["ciphertext"].(string), rewrapreply.Data["key_version"].(json.Number), nil
+	return reply.Data["ciphertext"].(string), reply.Data["key_version"].(json.Number), nil
 }
 
-// Trim key.
+// Trim older key versions setting a minimum version for the keyring.
+// Once trimmed, previous versions of the key cannot be recovered.
+// https://www.vaultproject.io/api/secret/transit#trim-key
 func (c *transitclient) Trim(d int) (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
@@ -141,7 +151,9 @@ func (c *transitclient) Trim(d int) (err error) {
 	return nil
 }
 
-// Listkeys
+// Listkeys returns a list of keys. Only the key names are returned
+// (not the actual keys themselves).
+// https://www.vaultproject.io/api/secret/transit#list-keys
 func (c *transitclient) Listkeys() (keys []interface{}, err error) {
 	r := c.client.NewRequest("LIST", "/v1/transit/keys")
 
@@ -151,28 +163,122 @@ func (c *transitclient) Listkeys() (keys []interface{}, err error) {
 	}
 	defer resp.Body.Close()
 
-	listreply := &api.Secret{}
-	if err := jsonutil.DecodeJSONFromReader(resp.Body, listreply); err != nil {
+	reply := &api.Secret{}
+	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
 		return nil, err
 	}
 
-	return listreply.Data["keys"].([]interface{}), nil
+	return reply.Data["keys"].([]interface{}), nil
 }
 
-// Config key - Minimum Decryption version - Minimum Encryption version.
-func (c *transitclient) Config(mindecrypion, minencryption int) (err error) {
+// Config key - Allows tuning configuration values for a given key.
+// https://www.vaultproject.io/api/secret/transit#update-key-configuration
+func (c *transitclient) Config(mindecrypion, minencryption int, deletion_allowed, exportable, allow_plaintext_backup bool) (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
 	}
 	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.Key+"/config")
 
-	reqbody := map[string]int{
+	reqbody := map[string]interface{}{
 		"min_decryption_version": mindecrypion,
 		"min_encryption_version": minencryption,
+		"deletion_allowed":       deletion_allowed,
+		"exportable":             exportable,
+		"allow_plaintext_backup": allow_plaintext_backup,
 	}
 	if err := r.SetJSONBody(reqbody); err != nil {
 		return err
 	}
+
+	resp, err := c.client.RawRequest(r)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return nil
+}
+
+// Backup returns a plaintext backup of a named key.
+// The backup contains all the configuration data and keys of all
+// the versions along with the HMAC key.
+// https://www.vaultproject.io/api/secret/transit#backup-key
+func (c *transitclient) Backup() (backup string, err error) {
+	if c.Key == "" {
+		return "", errors.New("no key provided")
+	}
+
+	r := c.client.NewRequest("GET", "/v1/transit/backup/"+c.Key)
+
+	resp, err := c.client.RawRequest(r)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	reply := &api.Secret{}
+	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
+		return "", err
+	}
+
+	return reply.Data["backup"].(string), nil
+}
+
+// Restore the backup as a named key. This will restore the key
+// configurations and all the versions of the named key along with HMAC keys.
+func (c *transitclient) Restore(a string) (err error) {
+	if c.Key == "" {
+		return errors.New("no key provided")
+	}
+
+	r := c.client.NewRequest("POST", "/v1/transit/restore/"+c.Key)
+
+	reqbody := map[string]string{"backup": a}
+	if err := r.SetJSONBody(reqbody); err != nil {
+		return err
+	}
+
+	resp, err := c.client.RawRequest(r)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return nil
+}
+
+// Read returns information about a named encryption key.
+// https://www.vaultproject.io/api/secret/transit#read-key
+func (c *transitclient) Read() (keyinfo *api.Secret, err error) {
+	if c.Key == "" {
+		return nil, errors.New("no key provided")
+	}
+
+	r := c.client.NewRequest("GET", "/v1/transit/keys/"+c.Key)
+
+	resp, err := c.client.RawRequest(r)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	reply := &api.Secret{}
+	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
+		return nil, err
+	}
+
+	return reply, nil
+}
+
+// Delete a named encryption key. It will no longer be possible
+// to decrypt any data encrypted with the named key.
+// https://www.vaultproject.io/api/secret/transit#delete-key
+func (c *transitclient) Delete() (err error) {
+	if c.Key == "" {
+		return errors.New("no key provided")
+	}
+
+	r := c.client.NewRequest("DELETE", "/v1/transit/keys/"+c.Key)
 
 	resp, err := c.client.RawRequest(r)
 	if err != nil {
