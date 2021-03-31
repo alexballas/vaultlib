@@ -2,21 +2,16 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/alexballas/vaultlib"
-)
-
-var (
-	vaultaddr = os.Getenv("VAULT_ADDR")
-	token     = os.Getenv("VAULT_TOKEN")
-	namespace = os.Getenv("VAULT_NAMESPACE")
 )
 
 func main() {
 	text := "Encrypt me please!"
 
-	transitclient, err := vaultlib.NewTransitClient(vaultaddr, token, "123", namespace)
+	vaultcfg := vaultlib.NewConfig()
+
+	transitclient, err := vaultlib.NewTransitClient(vaultcfg, "123")
 	check(err)
 
 	listk, err := transitclient.Listkeys()

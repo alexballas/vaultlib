@@ -6,26 +6,26 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
-func newclient(vaultaddr, namespace, token string) (*api.Client, error) {
-	if vaultaddr == "" {
+func (c *Config) newclient() (*api.Client, error) {
+	if c.Address == "" {
 		return nil, errors.New("no vault address provided")
 	}
 
-	if token == "" {
+	if c.Token == "" {
 		return nil, errors.New("no token provided")
 	}
 
 	client, err := api.NewClient(&api.Config{
-		Address: vaultaddr,
+		Address: c.Address,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	client.SetToken(token)
+	client.SetToken(c.Token)
 
-	if namespace != "" {
-		client.SetNamespace(namespace)
+	if c.NameSpace != "" {
+		client.SetNamespace(c.NameSpace)
 	}
 
 	return client, nil

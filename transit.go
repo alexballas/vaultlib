@@ -184,8 +184,8 @@ func (c *transitclient) Config(mindecrypion, minencryption int) (err error) {
 }
 
 // Newtransitclient - Generate new transit client.
-func NewTransitClient(addr, token, key, namespace string) (*transitclient, error) {
-	newclient, err := newclient(addr, namespace, token)
+func NewTransitClient(c *Config, key string) (*transitclient, error) {
+	newclient, err := c.newclient()
 	if err != nil {
 		return nil, err
 	}
