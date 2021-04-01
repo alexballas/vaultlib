@@ -170,10 +170,10 @@ func (c *Transit) Trim(d int) (err error) {
 	return nil
 }
 
-// Listkeys returns a list of keys. Only the key names are returned
+// ListKeys returns a list of keys. Only the key names are returned
 // (not the actual keys themselves).
 // https://www.vaultproject.io/api/secret/transit#list-keys
-func (c *Transit) Listkeys() (keys []interface{}, err error) {
+func (c *Transit) ListKeys() (keys []interface{}, err error) {
 	r := c.client.NewRequest("LIST", "/v1/transit/keys")
 
 	resp, err := c.client.RawRequest(r)

@@ -14,7 +14,7 @@ func main() {
 	transitclient, err := vaultlib.NewTransitClient(vaultcfg, "my-key")
 	check(err)
 
-	listk, err := transitclient.Listkeys()
+	listk, err := transitclient.ListKeys()
 	check(err)
 
 	cipher, version, err := transitclient.Encrypt(text)
