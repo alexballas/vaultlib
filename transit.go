@@ -332,7 +332,7 @@ func NewTransitClient(c *Config, key string) (*Transit, error) {
 	}, nil
 }
 
-// NewTransitClient - Generate new transit client.
+// NewKeyConfig - Generate new key configuration.
 func (c *Transit) NewKeyConfig() (*KeyConfig, error) {
 	if c.Key == "" {
 		return nil, errors.New("no key provided")
