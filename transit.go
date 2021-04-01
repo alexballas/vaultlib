@@ -35,7 +35,7 @@ type keyinfo struct {
 
 // Decrypt the provided ciphertext using the named key.
 // https://www.vaultproject.io/api/secret/transit#decrypt-data
-func (c *Transit) Decrypt(a string) (cipher string, err error) {
+func (c *Transit) Decrypt(a string) (text string, err error) {
 	if c.Key == "" {
 		return "", errors.New("no key provided")
 	}
@@ -65,7 +65,7 @@ func (c *Transit) Decrypt(a string) (cipher string, err error) {
 
 // Encrypt the provided plaintext using the named key.
 // https://www.vaultproject.io/api/secret/transit#encrypt-data
-func (c *Transit) Encrypt(a string) (text string, version json.Number, err error) {
+func (c *Transit) Encrypt(a string) (cipher string, version json.Number, err error) {
 	if c.Key == "" {
 		return "", "", errors.New("no key provided")
 	}
