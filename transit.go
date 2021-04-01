@@ -15,7 +15,7 @@ type Transit struct {
 	client *api.Client
 }
 
-type keyinfo struct {
+type Keyinfo struct {
 	Type                 string `mapstructure:"type"`
 	DeletionAllowed      bool   `mapstructure:"deletion_allowed"`
 	Derived              bool   `mapstructure:"derived"`
@@ -268,7 +268,7 @@ func (c *Transit) Restore(backup string) (err error) {
 
 // Read returns information about a named encryption key.
 // https://www.vaultproject.io/api/secret/transit#read-key
-func (c *Transit) Read() (key *keyinfo, err error) {
+func (c *Transit) Read() (key *Keyinfo, err error) {
 	if c.Key == "" {
 		return nil, errors.New("no key provided")
 	}
@@ -285,7 +285,7 @@ func (c *Transit) Read() (key *keyinfo, err error) {
 	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
 		return nil, err
 	}
-	out := &keyinfo{}
+	out := &Keyinfo{}
 	mapstructure.Decode(reply.Data, out)
 
 	return out, nil
