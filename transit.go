@@ -7,16 +7,35 @@ import (
 
 	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/sdk/helper/jsonutil"
+	"github.com/mitchellh/mapstructure"
 )
 
-type transitclient struct {
+type Transit struct {
 	Key    string
 	client *api.Client
 }
 
+type keyinfo struct {
+	Type                 string `mapstructure:"type"`
+	DeletionAllowed      bool   `mapstructure:"deletion_allowed"`
+	Derived              bool   `mapstructure:"derived"`
+	Exportable           bool   `mapstructure:"exportable"`
+	AllowPlaintextBackup bool   `mapstructure:"allow_plaintext_backup"`
+	Keys                 struct {
+		Num1 int `mapstructure:"1"`
+	} `mapstructure:"keys"`
+	MinDecryptionVersion int    `mapstructure:"min_decryption_version"`
+	MinEncryptionVersion int    `mapstructure:"min_encryption_version"`
+	Name                 string `mapstructure:"name"`
+	SupportsEncryption   bool   `mapstructure:"supports_encryption"`
+	SupportsDecryption   bool   `mapstructure:"supports_decryption"`
+	SupportsDerivation   bool   `mapstructure:"supports_derivation"`
+	SupportsSigning      bool   `mapstructure:"supports_signing"`
+}
+
 // Decrypt the provided ciphertext using the named key.
 // https://www.vaultproject.io/api/secret/transit#decrypt-data
-func (c *transitclient) Decrypt(a string) (cipher string, err error) {
+func (c *Transit) Decrypt(a string) (cipher string, err error) {
 	if c.Key == "" {
 		return "", errors.New("no key provided")
 	}
@@ -46,7 +65,7 @@ func (c *transitclient) Decrypt(a string) (cipher string, err error) {
 
 // Encrypt the provided plaintext using the named key.
 // https://www.vaultproject.io/api/secret/transit#encrypt-data
-func (c *transitclient) Encrypt(a string) (text string, version json.Number, err error) {
+func (c *Transit) Encrypt(a string) (text string, version json.Number, err error) {
 	if c.Key == "" {
 		return "", "", errors.New("no key provided")
 	}
@@ -79,7 +98,7 @@ func (c *transitclient) Encrypt(a string) (text string, version json.Number, err
 // After rotation, new plaintext requests will be  encrypted with the
 // new version of the key.
 // https://www.vaultproject.io/api/secret/transit#rotate-key
-func (c *transitclient) Rotate() (err error) {
+func (c *Transit) Rotate() (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
 	}
@@ -98,7 +117,7 @@ func (c *transitclient) Rotate() (err error) {
 // Because this never returns plaintext, it is possible to delegate this
 // functionality to untrusted users or scripts..
 // https://www.vaultproject.io/api/secret/transit#rewrap-data
-func (c *transitclient) Rewrap(a string) (cipher string, version json.Number, err error) {
+func (c *Transit) Rewrap(a string) (cipher string, version json.Number, err error) {
 	if c.Key == "" {
 		return "", "", errors.New("no key provided")
 	}
@@ -129,7 +148,7 @@ func (c *transitclient) Rewrap(a string) (cipher string, version json.Number, er
 // Trim older key versions setting a minimum version for the keyring.
 // Once trimmed, previous versions of the key cannot be recovered.
 // https://www.vaultproject.io/api/secret/transit#trim-key
-func (c *transitclient) Trim(d int) (err error) {
+func (c *Transit) Trim(d int) (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
 	}
@@ -154,7 +173,7 @@ func (c *transitclient) Trim(d int) (err error) {
 // Listkeys returns a list of keys. Only the key names are returned
 // (not the actual keys themselves).
 // https://www.vaultproject.io/api/secret/transit#list-keys
-func (c *transitclient) Listkeys() (keys []interface{}, err error) {
+func (c *Transit) Listkeys() (keys []interface{}, err error) {
 	r := c.client.NewRequest("LIST", "/v1/transit/keys")
 
 	resp, err := c.client.RawRequest(r)
@@ -173,7 +192,7 @@ func (c *transitclient) Listkeys() (keys []interface{}, err error) {
 
 // Config key - Allows tuning configuration values for a given key.
 // https://www.vaultproject.io/api/secret/transit#update-key-configuration
-func (c *transitclient) Config(mindecrypion, minencryption int, deletion_allowed, exportable, allow_plaintext_backup bool) (err error) {
+func (c *Transit) Config(mindecrypion, minencryption int, deletion_allowed, exportable, allow_plaintext_backup bool) (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
 	}
@@ -203,7 +222,7 @@ func (c *transitclient) Config(mindecrypion, minencryption int, deletion_allowed
 // The backup contains all the configuration data and keys of all
 // the versions along with the HMAC key.
 // https://www.vaultproject.io/api/secret/transit#backup-key
-func (c *transitclient) Backup() (backup string, err error) {
+func (c *Transit) Backup() (backup string, err error) {
 	if c.Key == "" {
 		return "", errors.New("no key provided")
 	}
@@ -226,14 +245,14 @@ func (c *transitclient) Backup() (backup string, err error) {
 
 // Restore the backup as a named key. This will restore the key
 // configurations and all the versions of the named key along with HMAC keys.
-func (c *transitclient) Restore(a string) (err error) {
+func (c *Transit) Restore(backup string) (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
 	}
 
 	r := c.client.NewRequest("POST", "/v1/transit/restore/"+c.Key)
 
-	reqbody := map[string]string{"backup": a}
+	reqbody := map[string]string{"backup": backup}
 	if err := r.SetJSONBody(reqbody); err != nil {
 		return err
 	}
@@ -249,7 +268,7 @@ func (c *transitclient) Restore(a string) (err error) {
 
 // Read returns information about a named encryption key.
 // https://www.vaultproject.io/api/secret/transit#read-key
-func (c *transitclient) Read() (keyinfo *api.Secret, err error) {
+func (c *Transit) Read() (key *keyinfo, err error) {
 	if c.Key == "" {
 		return nil, errors.New("no key provided")
 	}
@@ -266,14 +285,16 @@ func (c *transitclient) Read() (keyinfo *api.Secret, err error) {
 	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
 		return nil, err
 	}
+	out := &keyinfo{}
+	mapstructure.Decode(reply.Data, out)
 
-	return reply, nil
+	return out, nil
 }
 
 // Delete a named encryption key. It will no longer be possible
 // to decrypt any data encrypted with the named key.
 // https://www.vaultproject.io/api/secret/transit#delete-key
-func (c *transitclient) Delete() (err error) {
+func (c *Transit) Delete() (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
 	}
@@ -290,13 +311,13 @@ func (c *transitclient) Delete() (err error) {
 }
 
 // Newtransitclient - Generate new transit client.
-func NewTransitClient(c *Config, key string) (*transitclient, error) {
+func NewTransitClient(c *Config, key string) (*Transit, error) {
 	newclient, err := c.newclient()
 	if err != nil {
 		return nil, err
 	}
 
-	return &transitclient{
+	return &Transit{
 		Key:    key,
 		client: newclient,
 	}, nil

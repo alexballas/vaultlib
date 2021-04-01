@@ -11,7 +11,7 @@ func main() {
 
 	vaultcfg := vaultlib.NewConfig()
 
-	transitclient, err := vaultlib.NewTransitClient(vaultcfg, "123")
+	transitclient, err := vaultlib.NewTransitClient(vaultcfg, "my-key")
 	check(err)
 
 	listk, err := transitclient.Listkeys()
@@ -26,21 +26,21 @@ func main() {
 	info, err := transitclient.Read()
 	check(err)
 
-	fmt.Printf("Deletion allowed for %q: %v\n", transitclient.Key, info.Data["deletion_allowed"].(bool))
-
-	//transitclient.Rotate()
+	fmt.Printf("Deletion allowed for %q: %v\n", transitclient.Key, info.DeletionAllowed)
+	fmt.Printf("Encryption type for %q:  %v\n", transitclient.Key, info.Type)
 
 	fmt.Printf("All Keys: %s\n", listk)
 	fmt.Printf("Text: %s\n", text)
 	fmt.Printf("Encrypted: %s \\ Version: %s\n", cipher, version)
 	fmt.Printf("Decrypted: %s\n", dec)
 
-	fmt.Println(transitclient.Config(1, 1, true, true, true))
+	err = transitclient.Config(1, 1, true, true, true)
+	check(err)
+
 	//transitclient.Trim(1)
 
 	backup, err := transitclient.Backup()
 	check(err)
-	fmt.Println(backup)
 
 	err = transitclient.Delete()
 	check(err)

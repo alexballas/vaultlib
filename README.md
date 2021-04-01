@@ -1,2 +1,2 @@
 # vaultlib
-Hashicorp Vault library. NOT feature complete.
+Higher level Hashicorp Vault library. NOT feature complete.
