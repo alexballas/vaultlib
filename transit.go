@@ -15,7 +15,7 @@ type Transit struct {
 	client *api.Client
 }
 
-type Keyinfo struct {
+type KeyInfo struct {
 	Type                 string `mapstructure:"type"`
 	DeletionAllowed      bool   `mapstructure:"deletion_allowed"`
 	Derived              bool   `mapstructure:"derived"`
@@ -31,6 +31,14 @@ type Keyinfo struct {
 	SupportsDecryption   bool   `mapstructure:"supports_decryption"`
 	SupportsDerivation   bool   `mapstructure:"supports_derivation"`
 	SupportsSigning      bool   `mapstructure:"supports_signing"`
+}
+
+type KeyConfig struct {
+	MinDecrypion         int
+	MinEncryption        int
+	DeletionAllowed      bool
+	Exportable           bool
+	AllowPlaintextBackup bool
 }
 
 // Decrypt the provided ciphertext using the named key.
@@ -192,18 +200,19 @@ func (c *Transit) ListKeys() (keys []interface{}, err error) {
 
 // Config key - Allows tuning configuration values for a given key.
 // https://www.vaultproject.io/api/secret/transit#update-key-configuration
-func (c *Transit) Config(mindecrypion, minencryption int, deletion_allowed, exportable, allow_plaintext_backup bool) (err error) {
+func (c *Transit) Config(keycfg *KeyConfig) (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
 	}
+
 	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.Key+"/config")
 
 	reqbody := map[string]interface{}{
-		"min_decryption_version": mindecrypion,
-		"min_encryption_version": minencryption,
-		"deletion_allowed":       deletion_allowed,
-		"exportable":             exportable,
-		"allow_plaintext_backup": allow_plaintext_backup,
+		"min_decryption_version": keycfg.MinDecrypion,
+		"min_encryption_version": keycfg.MinEncryption,
+		"deletion_allowed":       keycfg.DeletionAllowed,
+		"exportable":             keycfg.Exportable,
+		"allow_plaintext_backup": keycfg.AllowPlaintextBackup,
 	}
 	if err := r.SetJSONBody(reqbody); err != nil {
 		return err
@@ -268,7 +277,7 @@ func (c *Transit) Restore(backup string) (err error) {
 
 // Read returns information about a named encryption key.
 // https://www.vaultproject.io/api/secret/transit#read-key
-func (c *Transit) Read() (key *Keyinfo, err error) {
+func (c *Transit) Read() (key *KeyInfo, err error) {
 	if c.Key == "" {
 		return nil, errors.New("no key provided")
 	}
@@ -285,7 +294,7 @@ func (c *Transit) Read() (key *Keyinfo, err error) {
 	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
 		return nil, err
 	}
-	out := &Keyinfo{}
+	out := &KeyInfo{}
 	mapstructure.Decode(reply.Data, out)
 
 	return out, nil
@@ -310,7 +319,7 @@ func (c *Transit) Delete() (err error) {
 	return nil
 }
 
-// Newtransitclient - Generate new transit client.
+// NewTransitClient - Generate new transit client.
 func NewTransitClient(c *Config, key string) (*Transit, error) {
 	newclient, err := c.newclient()
 	if err != nil {
@@ -320,5 +329,20 @@ func NewTransitClient(c *Config, key string) (*Transit, error) {
 	return &Transit{
 		Key:    key,
 		client: newclient,
+	}, nil
+}
+
+// NewTransitClient - Generate new transit client.
+func (c *Transit) NewKeyConfig() (*KeyConfig, error) {
+	if c.Key == "" {
+		return nil, errors.New("no key provided")
+	}
+
+	return &KeyConfig{
+		MinDecrypion:         1,
+		MinEncryption:        0,
+		DeletionAllowed:      false,
+		Exportable:           false,
+		AllowPlaintextBackup: false,
 	}, nil
 }
