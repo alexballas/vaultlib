@@ -22,10 +22,10 @@ type KeyInfo struct {
 	Exportable           bool   `mapstructure:"exportable"`
 	AllowPlaintextBackup bool   `mapstructure:"allow_plaintext_backup"`
 	Keys                 struct {
-		Num1 int `mapstructure:"1"`
+		Num1 int64 `mapstructure:"1"`
 	} `mapstructure:"keys"`
-	MinDecryptionVersion int    `mapstructure:"min_decryption_version"`
-	MinEncryptionVersion int    `mapstructure:"min_encryption_version"`
+	MinDecryptionVersion int64  `mapstructure:"min_decryption_version"`
+	MinEncryptionVersion int64  `mapstructure:"min_encryption_version"`
 	Name                 string `mapstructure:"name"`
 	SupportsEncryption   bool   `mapstructure:"supports_encryption"`
 	SupportsDecryption   bool   `mapstructure:"supports_decryption"`
@@ -34,8 +34,8 @@ type KeyInfo struct {
 }
 
 type KeyConfig struct {
-	MinDecrypion         int
-	MinEncryption        int
+	MinDecrypion         int64
+	MinEncryption        int64
 	DeletionAllowed      bool
 	Exportable           bool
 	AllowPlaintextBackup bool
@@ -73,9 +73,9 @@ func (c *Transit) Decrypt(a string) (text string, err error) {
 
 // Encrypt the provided plaintext using the named key.
 // https://www.vaultproject.io/api/secret/transit#encrypt-data
-func (c *Transit) Encrypt(a string) (cipher string, version json.Number, err error) {
+func (c *Transit) Encrypt(a string) (cipher string, version int64, err error) {
 	if c.Key == "" {
-		return "", "", errors.New("no key provided")
+		return "", 0, errors.New("no key provided")
 	}
 
 	sEnc := base64.StdEncoding.EncodeToString([]byte(a))
@@ -84,22 +84,27 @@ func (c *Transit) Encrypt(a string) (cipher string, version json.Number, err err
 	reqbody := map[string]string{"plaintext": sEnc}
 
 	if err := r.SetJSONBody(reqbody); err != nil {
-		return "", "", err
+		return "", 0, err
 	}
 
 	resp, err := c.client.RawRequest(r)
 	if err != nil {
-		return "", "", err
+		return "", 0, err
 	}
 	defer resp.Body.Close()
 
 	reply := &api.Secret{}
 
 	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
-		return "", "", err
+		return "", 0, err
 	}
 
-	return reply.Data["ciphertext"].(string), reply.Data["key_version"].(json.Number), nil
+	version, err = reply.Data["key_version"].(json.Number).Int64()
+	if err != nil {
+		return "", 0, err
+	}
+
+	return reply.Data["ciphertext"].(string), version, nil
 }
 
 // Rotate the version of the named key.
@@ -125,9 +130,9 @@ func (c *Transit) Rotate() (err error) {
 // Because this never returns plaintext, it is possible to delegate this
 // functionality to untrusted users or scripts..
 // https://www.vaultproject.io/api/secret/transit#rewrap-data
-func (c *Transit) Rewrap(a string) (cipher string, version json.Number, err error) {
+func (c *Transit) Rewrap(a string) (cipher string, version int64, err error) {
 	if c.Key == "" {
-		return "", "", errors.New("no key provided")
+		return "", 0, errors.New("no key provided")
 	}
 
 	r := c.client.NewRequest("POST", "/v1/transit/rewrap/"+c.Key)
@@ -135,35 +140,40 @@ func (c *Transit) Rewrap(a string) (cipher string, version json.Number, err erro
 	reqbody := map[string]string{"ciphertext": a}
 
 	if err := r.SetJSONBody(reqbody); err != nil {
-		return "", "", err
+		return "", 0, err
 	}
 
 	resp, err := c.client.RawRequest(r)
 	if err != nil {
-		return "", "", err
+		return "", 0, err
 	}
 	defer resp.Body.Close()
 
 	reply := &api.Secret{}
 
 	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
-		return "", "", err
+		return "", 0, err
 	}
 
-	return reply.Data["ciphertext"].(string), reply.Data["key_version"].(json.Number), nil
+	version, err = reply.Data["key_version"].(json.Number).Int64()
+	if err != nil {
+		return "", 0, err
+	}
+
+	return reply.Data["ciphertext"].(string), version, nil
 }
 
 // Trim older key versions setting a minimum version for the keyring.
 // Once trimmed, previous versions of the key cannot be recovered.
 // https://www.vaultproject.io/api/secret/transit#trim-key
-func (c *Transit) Trim(d int) (err error) {
+func (c *Transit) Trim(d int64) (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
 	}
 
 	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.Key+"/trim")
 
-	reqbody := map[string]int{"min_available_version": d}
+	reqbody := map[string]int64{"min_available_version": d}
 
 	if err := r.SetJSONBody(reqbody); err != nil {
 		return err

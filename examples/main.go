@@ -11,7 +11,7 @@ func main() {
 
 	vaultcfg := vaultlib.NewConfig()
 
-	transitclient, err := vaultlib.NewTransitClient(vaultcfg, "my-key123")
+	transitclient, err := vaultlib.NewTransitClient(vaultcfg, "my-key-test")
 	check(err)
 
 	listk, err := transitclient.ListKeys()
@@ -31,7 +31,7 @@ func main() {
 
 	fmt.Printf("All Keys: %s\n", listk)
 	fmt.Printf("Text: %s\n", text)
-	fmt.Printf("Encrypted: %s \\ Version: %s\n", cipher, version)
+	fmt.Printf("Encrypted: %s \\ Version: %d\n", cipher, version)
 	fmt.Printf("Decrypted: %s\n", dec)
 
 	keycfg, err := transitclient.NewKeyConfig()
@@ -40,11 +40,14 @@ func main() {
 	keycfg.Exportable = true
 	keycfg.AllowPlaintextBackup = true
 	keycfg.DeletionAllowed = true
+	keycfg.MinDecrypion = 1
+	keycfg.MinEncryption = 1
 
 	err = transitclient.Config(keycfg)
 	check(err)
 
-	//transitclient.Trim(1)
+	err = transitclient.Trim(1)
+	check(err)
 
 	backup, err := transitclient.Backup()
 	check(err)
@@ -55,6 +58,7 @@ func main() {
 	err = transitclient.Restore(backup)
 	check(err)
 
+	//transitclient.Rotate()
 }
 
 func check(err error) {
