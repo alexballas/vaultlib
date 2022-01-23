@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/alexballas/vaultlib"
@@ -9,21 +10,22 @@ import (
 func main() {
 	text := "Encrypt me please!"
 
+	ctx := context.Background()
 	vaultcfg := vaultlib.NewConfig()
 
 	transitclient, err := vaultlib.NewTransitClient(vaultcfg, "my-key-test")
 	check(err)
 
-	listk, err := transitclient.ListKeys()
+	listk, err := transitclient.ListKeys(ctx)
 	check(err)
 
-	cipher, version, err := transitclient.Encrypt(text)
+	cipher, version, err := transitclient.Encrypt(ctx, text)
 	check(err)
 
-	dec, err := transitclient.Decrypt(cipher)
+	dec, err := transitclient.Decrypt(ctx, cipher)
 	check(err)
 
-	info, err := transitclient.Read()
+	info, err := transitclient.Read(ctx)
 	check(err)
 
 	fmt.Printf("Deletion allowed for %q: %v\n", transitclient.Key, info.DeletionAllowed)
@@ -43,19 +45,19 @@ func main() {
 	keycfg.MinDecrypion = 1
 	keycfg.MinEncryption = 1
 
-	err = transitclient.Config(keycfg)
+	err = transitclient.Config(ctx, keycfg)
 	check(err)
 
-	err = transitclient.Trim(1)
+	err = transitclient.Trim(ctx, 1)
 	check(err)
 
-	backup, err := transitclient.Backup()
+	backup, err := transitclient.Backup(ctx)
 	check(err)
 
-	err = transitclient.Delete()
+	err = transitclient.Delete(ctx)
 	check(err)
 
-	err = transitclient.Restore(backup)
+	err = transitclient.Restore(ctx, backup)
 	check(err)
 
 	//transitclient.Rotate()

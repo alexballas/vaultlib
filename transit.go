@@ -1,6 +1,7 @@
 package vaultlib
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -11,26 +12,26 @@ import (
 )
 
 type Transit struct {
-	Key    string
 	client *api.Client
+	Key    string
 }
 
 type KeyInfo struct {
-	Type                 string `mapstructure:"type"`
-	DeletionAllowed      bool   `mapstructure:"deletion_allowed"`
-	Derived              bool   `mapstructure:"derived"`
-	Exportable           bool   `mapstructure:"exportable"`
-	AllowPlaintextBackup bool   `mapstructure:"allow_plaintext_backup"`
-	Keys                 struct {
+	Name string `mapstructure:"name"`
+	Type string `mapstructure:"type"`
+	Keys struct {
 		Num1 int64 `mapstructure:"1"`
 	} `mapstructure:"keys"`
-	MinDecryptionVersion int64  `mapstructure:"min_decryption_version"`
-	MinEncryptionVersion int64  `mapstructure:"min_encryption_version"`
-	Name                 string `mapstructure:"name"`
-	SupportsEncryption   bool   `mapstructure:"supports_encryption"`
-	SupportsDecryption   bool   `mapstructure:"supports_decryption"`
-	SupportsDerivation   bool   `mapstructure:"supports_derivation"`
-	SupportsSigning      bool   `mapstructure:"supports_signing"`
+	MinEncryptionVersion int64 `mapstructure:"min_encryption_version"`
+	MinDecryptionVersion int64 `mapstructure:"min_decryption_version"`
+	AllowPlaintextBackup bool  `mapstructure:"allow_plaintext_backup"`
+	Exportable           bool  `mapstructure:"exportable"`
+	Derived              bool  `mapstructure:"derived"`
+	DeletionAllowed      bool  `mapstructure:"deletion_allowed"`
+	SupportsEncryption   bool  `mapstructure:"supports_encryption"`
+	SupportsDecryption   bool  `mapstructure:"supports_decryption"`
+	SupportsDerivation   bool  `mapstructure:"supports_derivation"`
+	SupportsSigning      bool  `mapstructure:"supports_signing"`
 }
 
 type KeyConfig struct {
@@ -43,7 +44,7 @@ type KeyConfig struct {
 
 // Decrypt the provided ciphertext using the named key.
 // https://www.vaultproject.io/api/secret/transit#decrypt-data
-func (c *Transit) Decrypt(a string) (text string, err error) {
+func (c *Transit) Decrypt(ctx context.Context, a string) (text string, err error) {
 	if c.Key == "" {
 		return "", errors.New("no key provided")
 	}
@@ -56,7 +57,7 @@ func (c *Transit) Decrypt(a string) (text string, err error) {
 		return "", err
 	}
 
-	resp, err := c.client.RawRequest(r)
+	resp, err := c.client.RawRequestWithContext(ctx, r)
 	if err != nil {
 		return "", err
 	}
@@ -73,7 +74,7 @@ func (c *Transit) Decrypt(a string) (text string, err error) {
 
 // Encrypt the provided plaintext using the named key.
 // https://www.vaultproject.io/api/secret/transit#encrypt-data
-func (c *Transit) Encrypt(a string) (cipher string, version int64, err error) {
+func (c *Transit) Encrypt(ctx context.Context, a string) (cipher string, version int64, err error) {
 	if c.Key == "" {
 		return "", 0, errors.New("no key provided")
 	}
@@ -87,7 +88,7 @@ func (c *Transit) Encrypt(a string) (cipher string, version int64, err error) {
 		return "", 0, err
 	}
 
-	resp, err := c.client.RawRequest(r)
+	resp, err := c.client.RawRequestWithContext(ctx, r)
 	if err != nil {
 		return "", 0, err
 	}
@@ -111,13 +112,13 @@ func (c *Transit) Encrypt(a string) (cipher string, version int64, err error) {
 // After rotation, new plaintext requests will be  encrypted with the
 // new version of the key.
 // https://www.vaultproject.io/api/secret/transit#rotate-key
-func (c *Transit) Rotate() (err error) {
+func (c *Transit) Rotate(ctx context.Context) (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
 	}
 
 	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.Key+"/rotate")
-	resp, err := c.client.RawRequest(r)
+	resp, err := c.client.RawRequestWithContext(ctx, r)
 	if err != nil {
 		return err
 	}
@@ -130,7 +131,7 @@ func (c *Transit) Rotate() (err error) {
 // Because this never returns plaintext, it is possible to delegate this
 // functionality to untrusted users or scripts..
 // https://www.vaultproject.io/api/secret/transit#rewrap-data
-func (c *Transit) Rewrap(a string) (cipher string, version int64, err error) {
+func (c *Transit) Rewrap(ctx context.Context, a string) (cipher string, version int64, err error) {
 	if c.Key == "" {
 		return "", 0, errors.New("no key provided")
 	}
@@ -143,7 +144,7 @@ func (c *Transit) Rewrap(a string) (cipher string, version int64, err error) {
 		return "", 0, err
 	}
 
-	resp, err := c.client.RawRequest(r)
+	resp, err := c.client.RawRequestWithContext(ctx, r)
 	if err != nil {
 		return "", 0, err
 	}
@@ -166,7 +167,7 @@ func (c *Transit) Rewrap(a string) (cipher string, version int64, err error) {
 // Trim older key versions setting a minimum version for the keyring.
 // Once trimmed, previous versions of the key cannot be recovered.
 // https://www.vaultproject.io/api/secret/transit#trim-key
-func (c *Transit) Trim(d int64) (err error) {
+func (c *Transit) Trim(ctx context.Context, d int64) (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
 	}
@@ -179,7 +180,7 @@ func (c *Transit) Trim(d int64) (err error) {
 		return err
 	}
 
-	resp, err := c.client.RawRequest(r)
+	resp, err := c.client.RawRequestWithContext(ctx, r)
 	if err != nil {
 		return err
 	}
@@ -191,10 +192,10 @@ func (c *Transit) Trim(d int64) (err error) {
 // ListKeys returns a list of keys. Only the key names are returned
 // (not the actual keys themselves).
 // https://www.vaultproject.io/api/secret/transit#list-keys
-func (c *Transit) ListKeys() (keys []interface{}, err error) {
+func (c *Transit) ListKeys(ctx context.Context) (keys []interface{}, err error) {
 	r := c.client.NewRequest("LIST", "/v1/transit/keys")
 
-	resp, err := c.client.RawRequest(r)
+	resp, err := c.client.RawRequestWithContext(ctx, r)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +211,7 @@ func (c *Transit) ListKeys() (keys []interface{}, err error) {
 
 // Config key - Allows tuning configuration values for a given key.
 // https://www.vaultproject.io/api/secret/transit#update-key-configuration
-func (c *Transit) Config(keycfg *KeyConfig) (err error) {
+func (c *Transit) Config(ctx context.Context, keycfg *KeyConfig) (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
 	}
@@ -228,7 +229,7 @@ func (c *Transit) Config(keycfg *KeyConfig) (err error) {
 		return err
 	}
 
-	resp, err := c.client.RawRequest(r)
+	resp, err := c.client.RawRequestWithContext(ctx, r)
 	if err != nil {
 		return err
 	}
@@ -241,14 +242,14 @@ func (c *Transit) Config(keycfg *KeyConfig) (err error) {
 // The backup contains all the configuration data and keys of all
 // the versions along with the HMAC key.
 // https://www.vaultproject.io/api/secret/transit#backup-key
-func (c *Transit) Backup() (backup string, err error) {
+func (c *Transit) Backup(ctx context.Context) (backup string, err error) {
 	if c.Key == "" {
 		return "", errors.New("no key provided")
 	}
 
 	r := c.client.NewRequest("GET", "/v1/transit/backup/"+c.Key)
 
-	resp, err := c.client.RawRequest(r)
+	resp, err := c.client.RawRequestWithContext(ctx, r)
 	if err != nil {
 		return "", err
 	}
@@ -264,7 +265,7 @@ func (c *Transit) Backup() (backup string, err error) {
 
 // Restore the backup as a named key. This will restore the key
 // configurations and all the versions of the named key along with HMAC keys.
-func (c *Transit) Restore(backup string) (err error) {
+func (c *Transit) Restore(ctx context.Context, backup string) (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
 	}
@@ -276,7 +277,7 @@ func (c *Transit) Restore(backup string) (err error) {
 		return err
 	}
 
-	resp, err := c.client.RawRequest(r)
+	resp, err := c.client.RawRequestWithContext(ctx, r)
 	if err != nil {
 		return err
 	}
@@ -287,14 +288,14 @@ func (c *Transit) Restore(backup string) (err error) {
 
 // Read returns information about a named encryption key.
 // https://www.vaultproject.io/api/secret/transit#read-key
-func (c *Transit) Read() (key *KeyInfo, err error) {
+func (c *Transit) Read(ctx context.Context) (key *KeyInfo, err error) {
 	if c.Key == "" {
 		return nil, errors.New("no key provided")
 	}
 
 	r := c.client.NewRequest("GET", "/v1/transit/keys/"+c.Key)
 
-	resp, err := c.client.RawRequest(r)
+	resp, err := c.client.RawRequestWithContext(ctx, r)
 	if err != nil {
 		return nil, err
 	}
@@ -313,14 +314,14 @@ func (c *Transit) Read() (key *KeyInfo, err error) {
 // Delete a named encryption key. It will no longer be possible
 // to decrypt any data encrypted with the named key.
 // https://www.vaultproject.io/api/secret/transit#delete-key
-func (c *Transit) Delete() (err error) {
+func (c *Transit) Delete(ctx context.Context) (err error) {
 	if c.Key == "" {
 		return errors.New("no key provided")
 	}
 
 	r := c.client.NewRequest("DELETE", "/v1/transit/keys/"+c.Key)
 
-	resp, err := c.client.RawRequest(r)
+	resp, err := c.client.RawRequestWithContext(ctx, r)
 	if err != nil {
 		return err
 	}
