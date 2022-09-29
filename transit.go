@@ -11,6 +11,10 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
+var (
+	ErrNoKey = errors.New("no key provided")
+)
+
 type Transit struct {
 	client *api.Client
 	Key    string
@@ -46,7 +50,7 @@ type KeyConfig struct {
 // https://www.vaultproject.io/api/secret/transit#decrypt-data
 func (c *Transit) Decrypt(ctx context.Context, a string) (text string, err error) {
 	if c.Key == "" {
-		return "", errors.New("no key provided")
+		return "", ErrNoKey
 	}
 
 	r := c.client.NewRequest("POST", "/v1/transit/decrypt/"+c.Key)
@@ -76,7 +80,7 @@ func (c *Transit) Decrypt(ctx context.Context, a string) (text string, err error
 // https://www.vaultproject.io/api/secret/transit#encrypt-data
 func (c *Transit) Encrypt(ctx context.Context, a string) (cipher string, version int64, err error) {
 	if c.Key == "" {
-		return "", 0, errors.New("no key provided")
+		return "", 0, ErrNoKey
 	}
 
 	sEnc := base64.StdEncoding.EncodeToString([]byte(a))
@@ -114,7 +118,7 @@ func (c *Transit) Encrypt(ctx context.Context, a string) (cipher string, version
 // https://www.vaultproject.io/api/secret/transit#rotate-key
 func (c *Transit) Rotate(ctx context.Context) (err error) {
 	if c.Key == "" {
-		return errors.New("no key provided")
+		return ErrNoKey
 	}
 
 	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.Key+"/rotate")
@@ -133,7 +137,7 @@ func (c *Transit) Rotate(ctx context.Context) (err error) {
 // https://www.vaultproject.io/api/secret/transit#rewrap-data
 func (c *Transit) Rewrap(ctx context.Context, a string) (cipher string, version int64, err error) {
 	if c.Key == "" {
-		return "", 0, errors.New("no key provided")
+		return "", 0, ErrNoKey
 	}
 
 	r := c.client.NewRequest("POST", "/v1/transit/rewrap/"+c.Key)
@@ -169,7 +173,7 @@ func (c *Transit) Rewrap(ctx context.Context, a string) (cipher string, version 
 // https://www.vaultproject.io/api/secret/transit#trim-key
 func (c *Transit) Trim(ctx context.Context, d int64) (err error) {
 	if c.Key == "" {
-		return errors.New("no key provided")
+		return ErrNoKey
 	}
 
 	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.Key+"/trim")
@@ -213,7 +217,7 @@ func (c *Transit) ListKeys(ctx context.Context) (keys []interface{}, err error) 
 // https://www.vaultproject.io/api/secret/transit#update-key-configuration
 func (c *Transit) Config(ctx context.Context, keycfg *KeyConfig) (err error) {
 	if c.Key == "" {
-		return errors.New("no key provided")
+		return ErrNoKey
 	}
 
 	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.Key+"/config")
@@ -244,7 +248,7 @@ func (c *Transit) Config(ctx context.Context, keycfg *KeyConfig) (err error) {
 // https://www.vaultproject.io/api/secret/transit#backup-key
 func (c *Transit) Backup(ctx context.Context) (backup string, err error) {
 	if c.Key == "" {
-		return "", errors.New("no key provided")
+		return "", ErrNoKey
 	}
 
 	r := c.client.NewRequest("GET", "/v1/transit/backup/"+c.Key)
@@ -267,7 +271,7 @@ func (c *Transit) Backup(ctx context.Context) (backup string, err error) {
 // configurations and all the versions of the named key along with HMAC keys.
 func (c *Transit) Restore(ctx context.Context, backup string) (err error) {
 	if c.Key == "" {
-		return errors.New("no key provided")
+		return ErrNoKey
 	}
 
 	r := c.client.NewRequest("POST", "/v1/transit/restore/"+c.Key)
@@ -290,7 +294,7 @@ func (c *Transit) Restore(ctx context.Context, backup string) (err error) {
 // https://www.vaultproject.io/api/secret/transit#read-key
 func (c *Transit) Read(ctx context.Context) (key *KeyInfo, err error) {
 	if c.Key == "" {
-		return nil, errors.New("no key provided")
+		return nil, ErrNoKey
 	}
 
 	r := c.client.NewRequest("GET", "/v1/transit/keys/"+c.Key)
@@ -316,7 +320,7 @@ func (c *Transit) Read(ctx context.Context) (key *KeyInfo, err error) {
 // https://www.vaultproject.io/api/secret/transit#delete-key
 func (c *Transit) Delete(ctx context.Context) (err error) {
 	if c.Key == "" {
-		return errors.New("no key provided")
+		return ErrNoKey
 	}
 
 	r := c.client.NewRequest("DELETE", "/v1/transit/keys/"+c.Key)
@@ -346,7 +350,7 @@ func NewTransitClient(c *Config, key string) (*Transit, error) {
 // NewKeyConfig - Generate new key configuration.
 func (c *Transit) NewKeyConfig() (*KeyConfig, error) {
 	if c.Key == "" {
-		return nil, errors.New("no key provided")
+		return nil, ErrNoKey
 	}
 
 	return &KeyConfig{

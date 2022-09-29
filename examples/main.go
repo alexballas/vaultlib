@@ -11,6 +11,7 @@ func main() {
 	text := "Encrypt me please!"
 
 	ctx := context.Background()
+
 	vaultcfg := vaultlib.NewConfig()
 
 	transitclient, err := vaultlib.NewTransitClient(vaultcfg, "my-key-test")
