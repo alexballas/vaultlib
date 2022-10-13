@@ -8,23 +8,31 @@ import (
 )
 
 func main() {
-	text := "Encrypt me please!"
+	text := "Example text!"
 
 	ctx := context.Background()
 
 	vaultcfg := vaultlib.NewConfig()
 
-	transitclient, err := vaultlib.NewTransitClient(vaultcfg, "my-key-test")
+	transitclient, err := vaultlib.NewTransitClient(vaultcfg, "my-key7")
+	check(err)
+
+	err = transitclient.CreateKey(ctx, "")
 	check(err)
 
 	listk, err := transitclient.ListKeys(ctx)
 	check(err)
 
-	cipher, version, err := transitclient.Encrypt(ctx, text)
+	cipher, version, err := transitclient.Encrypt(ctx, 0, text)
 	check(err)
 
 	dec, err := transitclient.Decrypt(ctx, cipher)
 	check(err)
+
+	hash, err := transitclient.Hmac(ctx, "sha2-256", 0, text)
+	check(err)
+
+	fmt.Println("Hash: ", hash)
 
 	info, err := transitclient.Read(ctx)
 	check(err)
@@ -43,14 +51,14 @@ func main() {
 	keycfg.Exportable = true
 	keycfg.AllowPlaintextBackup = true
 	keycfg.DeletionAllowed = true
-	keycfg.MinDecrypion = 1
-	keycfg.MinEncryption = 1
+	//keycfg.MinDecrypion = 1
+	//keycfg.MinEncryption = 0
 
 	err = transitclient.Config(ctx, keycfg)
 	check(err)
 
-	err = transitclient.Trim(ctx, 1)
-	check(err)
+	//err = transitclient.Trim(ctx, 1)
+	//check(err)
 
 	backup, err := transitclient.Backup(ctx)
 	check(err)
@@ -61,7 +69,7 @@ func main() {
 	err = transitclient.Restore(ctx, backup)
 	check(err)
 
-	//transitclient.Rotate()
+	//transitclient.Rotate(ctx)
 }
 
 func check(err error) {

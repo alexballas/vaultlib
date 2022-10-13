@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
+	"strconv"
 
 	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/sdk/helper/jsonutil"
@@ -12,7 +14,9 @@ import (
 )
 
 var (
-	ErrNoKey = errors.New("no key provided")
+	ErrNoKey   = errors.New("no key provided")
+	ErrBadAlgo = errors.New("invalid algorith input")
+	ErrBadKey  = errors.New("invalid key type")
 )
 
 type Transit struct {
@@ -21,21 +25,21 @@ type Transit struct {
 }
 
 type KeyInfo struct {
-	Name string `mapstructure:"name"`
-	Type string `mapstructure:"type"`
 	Keys struct {
-		Num1 int64 `mapstructure:"1"`
+		Num1 interface{} `mapstructure:"1"`
 	} `mapstructure:"keys"`
-	MinEncryptionVersion int64 `mapstructure:"min_encryption_version"`
-	MinDecryptionVersion int64 `mapstructure:"min_decryption_version"`
-	AllowPlaintextBackup bool  `mapstructure:"allow_plaintext_backup"`
-	Exportable           bool  `mapstructure:"exportable"`
-	Derived              bool  `mapstructure:"derived"`
-	DeletionAllowed      bool  `mapstructure:"deletion_allowed"`
-	SupportsEncryption   bool  `mapstructure:"supports_encryption"`
-	SupportsDecryption   bool  `mapstructure:"supports_decryption"`
-	SupportsDerivation   bool  `mapstructure:"supports_derivation"`
-	SupportsSigning      bool  `mapstructure:"supports_signing"`
+	Name                 string `mapstructure:"name"`
+	Type                 string `mapstructure:"type"`
+	MinEncryptionVersion int64  `mapstructure:"min_encryption_version"`
+	MinDecryptionVersion int64  `mapstructure:"min_decryption_version"`
+	Exportable           bool   `mapstructure:"exportable"`
+	AllowPlaintextBackup bool   `mapstructure:"allow_plaintext_backup"`
+	Derived              bool   `mapstructure:"derived"`
+	DeletionAllowed      bool   `mapstructure:"deletion_allowed"`
+	SupportsEncryption   bool   `mapstructure:"supports_encryption"`
+	SupportsDecryption   bool   `mapstructure:"supports_decryption"`
+	SupportsDerivation   bool   `mapstructure:"supports_derivation"`
+	SupportsSigning      bool   `mapstructure:"supports_signing"`
 }
 
 type KeyConfig struct {
@@ -47,15 +51,15 @@ type KeyConfig struct {
 }
 
 // Decrypt the provided ciphertext using the named key.
-// https://www.vaultproject.io/api/secret/transit#decrypt-data
-func (c *Transit) Decrypt(ctx context.Context, a string) (text string, err error) {
+// https://www.vaultproject.io/api-docs/secret/transit#decrypt-data
+func (c *Transit) Decrypt(ctx context.Context, input string) (text string, err error) {
 	if c.Key == "" {
 		return "", ErrNoKey
 	}
 
 	r := c.client.NewRequest("POST", "/v1/transit/decrypt/"+c.Key)
 
-	reqbody := map[string]string{"ciphertext": a}
+	reqbody := map[string]string{"ciphertext": input}
 
 	if err := r.SetJSONBody(reqbody); err != nil {
 		return "", err
@@ -77,16 +81,19 @@ func (c *Transit) Decrypt(ctx context.Context, a string) (text string, err error
 }
 
 // Encrypt the provided plaintext using the named key.
-// https://www.vaultproject.io/api/secret/transit#encrypt-data
-func (c *Transit) Encrypt(ctx context.Context, a string) (cipher string, version int64, err error) {
+// https://www.vaultproject.io/api-docs/secret/transit#encrypt-data
+func (c *Transit) Encrypt(ctx context.Context, key_version int, input string) (cipher string, version int64, err error) {
 	if c.Key == "" {
 		return "", 0, ErrNoKey
 	}
 
-	sEnc := base64.StdEncoding.EncodeToString([]byte(a))
+	sEnc := base64.StdEncoding.EncodeToString([]byte(input))
 	r := c.client.NewRequest("POST", "/v1/transit/encrypt/"+c.Key)
 
-	reqbody := map[string]string{"plaintext": sEnc}
+	reqbody := map[string]string{
+		"plaintext":   sEnc,
+		"key_version": strconv.Itoa(key_version),
+	}
 
 	if err := r.SetJSONBody(reqbody); err != nil {
 		return "", 0, err
@@ -115,7 +122,7 @@ func (c *Transit) Encrypt(ctx context.Context, a string) (cipher string, version
 // Rotate the version of the named key.
 // After rotation, new plaintext requests will be  encrypted with the
 // new version of the key.
-// https://www.vaultproject.io/api/secret/transit#rotate-key
+// https://www.vaultproject.io/api-docs/secret/transit#rotate-key
 func (c *Transit) Rotate(ctx context.Context) (err error) {
 	if c.Key == "" {
 		return ErrNoKey
@@ -134,15 +141,15 @@ func (c *Transit) Rotate(ctx context.Context) (err error) {
 // Rewrap  the provided ciphertext using the latest version of the named key.
 // Because this never returns plaintext, it is possible to delegate this
 // functionality to untrusted users or scripts..
-// https://www.vaultproject.io/api/secret/transit#rewrap-data
-func (c *Transit) Rewrap(ctx context.Context, a string) (cipher string, version int64, err error) {
+// https://www.vaultproject.io/api-docs/secret/transit#rewrap-data
+func (c *Transit) Rewrap(ctx context.Context, input string) (cipher string, version int64, err error) {
 	if c.Key == "" {
 		return "", 0, ErrNoKey
 	}
 
 	r := c.client.NewRequest("POST", "/v1/transit/rewrap/"+c.Key)
 
-	reqbody := map[string]string{"ciphertext": a}
+	reqbody := map[string]string{"ciphertext": input}
 
 	if err := r.SetJSONBody(reqbody); err != nil {
 		return "", 0, err
@@ -170,7 +177,7 @@ func (c *Transit) Rewrap(ctx context.Context, a string) (cipher string, version 
 
 // Trim older key versions setting a minimum version for the keyring.
 // Once trimmed, previous versions of the key cannot be recovered.
-// https://www.vaultproject.io/api/secret/transit#trim-key
+// https://www.vaultproject.io/api-docs/secret/transit#trim-key
 func (c *Transit) Trim(ctx context.Context, d int64) (err error) {
 	if c.Key == "" {
 		return ErrNoKey
@@ -195,7 +202,7 @@ func (c *Transit) Trim(ctx context.Context, d int64) (err error) {
 
 // ListKeys returns a list of keys. Only the key names are returned
 // (not the actual keys themselves).
-// https://www.vaultproject.io/api/secret/transit#list-keys
+// https://www.vaultproject.io/api-docs/secret/transit#list-keys
 func (c *Transit) ListKeys(ctx context.Context) (keys []interface{}, err error) {
 	r := c.client.NewRequest("LIST", "/v1/transit/keys")
 
@@ -214,7 +221,7 @@ func (c *Transit) ListKeys(ctx context.Context) (keys []interface{}, err error) 
 }
 
 // Config key - Allows tuning configuration values for a given key.
-// https://www.vaultproject.io/api/secret/transit#update-key-configuration
+// https://www.vaultproject.io/api-docs/secret/transit#update-key-configuration
 func (c *Transit) Config(ctx context.Context, keycfg *KeyConfig) (err error) {
 	if c.Key == "" {
 		return ErrNoKey
@@ -245,7 +252,7 @@ func (c *Transit) Config(ctx context.Context, keycfg *KeyConfig) (err error) {
 // Backup returns a plaintext backup of a named key.
 // The backup contains all the configuration data and keys of all
 // the versions along with the HMAC key.
-// https://www.vaultproject.io/api/secret/transit#backup-key
+// https://www.vaultproject.io/api-docs/secret/transit#backup-key
 func (c *Transit) Backup(ctx context.Context) (backup string, err error) {
 	if c.Key == "" {
 		return "", ErrNoKey
@@ -291,7 +298,7 @@ func (c *Transit) Restore(ctx context.Context, backup string) (err error) {
 }
 
 // Read returns information about a named encryption key.
-// https://www.vaultproject.io/api/secret/transit#read-key
+// https://www.vaultproject.io/api-docs/secret/transit#read-key
 func (c *Transit) Read(ctx context.Context) (key *KeyInfo, err error) {
 	if c.Key == "" {
 		return nil, ErrNoKey
@@ -309,15 +316,18 @@ func (c *Transit) Read(ctx context.Context) (key *KeyInfo, err error) {
 	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
 		return nil, err
 	}
+
 	out := &KeyInfo{}
-	mapstructure.Decode(reply.Data, out)
+	if err := mapstructure.Decode(reply.Data, out); err != nil {
+		return nil, err
+	}
 
 	return out, nil
 }
 
 // Delete a named encryption key. It will no longer be possible
 // to decrypt any data encrypted with the named key.
-// https://www.vaultproject.io/api/secret/transit#delete-key
+// https://www.vaultproject.io/api-docs/secret/transit#delete-key
 func (c *Transit) Delete(ctx context.Context) (err error) {
 	if c.Key == "" {
 		return ErrNoKey
@@ -330,6 +340,122 @@ func (c *Transit) Delete(ctx context.Context) (err error) {
 		return err
 	}
 	defer resp.Body.Close()
+
+	return nil
+}
+
+// Hmac
+// https://www.vaultproject.io/api-docs/secret/transit#generate-hmac
+func (c *Transit) Hmac(ctx context.Context, algo string, key_version int, input string) (text string, err error) {
+	if c.Key == "" {
+		return "", ErrNoKey
+	}
+
+	algoExists := func() bool {
+		supportedAlgos := [...]string{
+			"sha1",
+			"sha2-224",
+			"sha2-256",
+			"sha2-384",
+			"sha2-512",
+			"sha3-224",
+			"sha3-256",
+			"sha3-384",
+			"sha3-512",
+		}
+
+		for _, a := range supportedAlgos {
+			if a == algo {
+				return true
+			}
+		}
+		return false
+	}
+
+	if !algoExists() {
+		return "", ErrBadAlgo
+	}
+
+	inputB64 := base64.StdEncoding.EncodeToString([]byte(input))
+
+	r := c.client.NewRequest("POST", "/v1/transit/hmac/"+c.Key+"/"+algo)
+
+	reqbody := map[string]string{"input": inputB64, "key_version": strconv.Itoa(key_version)}
+
+	if err := r.SetJSONBody(reqbody); err != nil {
+		return "", err
+	}
+
+	resp, err := c.client.RawRequestWithContext(ctx, r)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	reply := &api.Secret{}
+	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
+		return "", err
+	}
+	hmacRes := reply.Data["hmac"].(string)
+
+	return hmacRes, nil
+}
+
+// Create - Create new key.
+// https://www.vaultproject.io/api-docs/secret/transit#create-key
+func (c *Transit) CreateKey(ctx context.Context, keytype string) error {
+	r := c.client.NewRequest("POST", "/v1/transit/keys/"+c.Key)
+
+	keyExists := func() bool {
+		if keytype == "" {
+			return true
+		}
+
+		supportedKeys := [...]string{
+			"aes128-gcm96",
+			"aes256-gcm96",
+			"chacha20-poly1305",
+			"ed25519",
+			"ecdsa-p256",
+			"ecdsa-p384",
+			"ecdsa-p521",
+			"rsa-2048",
+			"rsa-3072",
+			"rsa-4096",
+			"hmac",
+		}
+
+		for _, a := range supportedKeys {
+			if a == keytype {
+				return true
+			}
+		}
+		return false
+	}
+
+	if !keyExists() {
+		return ErrBadKey
+	}
+
+	reqbody := map[string]interface{}{}
+
+	if keytype != "" {
+		reqbody = map[string]interface{}{"type": keytype}
+	}
+
+	if err := r.SetJSONBody(reqbody); err != nil {
+		return err
+	}
+
+	resp, err := c.client.RawRequestWithContext(ctx, r)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		return err
+	}
 
 	return nil
 }
