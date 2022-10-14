@@ -14,7 +14,7 @@ func main() {
 
 	vaultcfg := vaultlib.NewConfig()
 
-	transitclient, err := vaultlib.NewTransitClient(vaultcfg, "my-key7")
+	transitclient, err := vaultlib.NewTransitClient(vaultcfg, "my-key")
 	check(err)
 
 	err = transitclient.CreateKey(ctx, "")
@@ -36,9 +36,9 @@ func main() {
 
 	info, err := transitclient.Read(ctx)
 	check(err)
-
 	fmt.Printf("Deletion allowed for %q: %v\n", transitclient.Key, info.DeletionAllowed)
 	fmt.Printf("Encryption type for %q:  %v\n", transitclient.Key, info.Type)
+	fmt.Printf("Supports Ecryption: %v, Support Decryption: %v, Supports Signing: %v\n", info.SupportsEncryption, info.SupportsDecryption, info.SupportsSigning)
 
 	fmt.Printf("All Keys: %s\n", listk)
 	fmt.Printf("Text: %s\n", text)
@@ -51,14 +51,31 @@ func main() {
 	keycfg.Exportable = true
 	keycfg.AllowPlaintextBackup = true
 	keycfg.DeletionAllowed = true
-	//keycfg.MinDecrypion = 1
-	//keycfg.MinEncryption = 0
+	/* keycfg.MinDecrypion = 1
+	keycfg.MinEncryption = 0 */
 
 	err = transitclient.Config(ctx, keycfg)
 	check(err)
 
-	//err = transitclient.Trim(ctx, 1)
-	//check(err)
+	info2, err := transitclient.Read(ctx)
+	check(err)
+	fmt.Println(info2.Exportable)
+
+	out, err := transitclient.Export(ctx, vaultlib.ExportEncryptionKey, 0)
+	check(err)
+	fmt.Printf("Exported Encryption Key: %s\n", out)
+
+	out2, err := transitclient.Export(ctx, vaultlib.ExportHMACKey, 0)
+	check(err)
+	fmt.Printf("Exported HMAC Key: %s\n", out2)
+	/*
+		out3, err := transitclient.Export(ctx, vaultlib.ExportSigningKey, 0)
+		check(err)
+		fmt.Printf("Exported Signing Key: %s\n", out3)
+	*/
+
+	/* 	err = transitclient.Trim(ctx, 1)
+	   	check(err) */
 
 	backup, err := transitclient.Backup(ctx)
 	check(err)
@@ -69,7 +86,8 @@ func main() {
 	err = transitclient.Restore(ctx, backup)
 	check(err)
 
-	//transitclient.Rotate(ctx)
+	/* 	transitclient.Rotate(ctx)
+	 */
 }
 
 func check(err error) {

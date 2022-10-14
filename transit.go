@@ -13,10 +13,19 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
+const (
+	ExportEncryptionKey ExportKeyType = iota
+	ExportSigningKey
+	ExportHMACKey
+)
+
+type ExportKeyType int
+
 var (
-	ErrNoKey   = errors.New("no key provided")
-	ErrBadAlgo = errors.New("invalid algorith input")
-	ErrBadKey  = errors.New("invalid key type")
+	ErrNoKey         = errors.New("no key provided")
+	ErrBadAlgo       = errors.New("invalid algorith input")
+	ErrBadKey        = errors.New("invalid key type")
+	ErrBadKeyVersion = errors.New("bad key version")
 )
 
 type Transit struct {
@@ -135,6 +144,10 @@ func (c *Transit) Rotate(ctx context.Context) (err error) {
 	}
 	defer resp.Body.Close()
 
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -197,6 +210,10 @@ func (c *Transit) Trim(ctx context.Context, d int64) (err error) {
 	}
 	defer resp.Body.Close()
 
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -236,6 +253,7 @@ func (c *Transit) Config(ctx context.Context, keycfg *KeyConfig) (err error) {
 		"exportable":             keycfg.Exportable,
 		"allow_plaintext_backup": keycfg.AllowPlaintextBackup,
 	}
+
 	if err := r.SetJSONBody(reqbody); err != nil {
 		return err
 	}
@@ -245,6 +263,10 @@ func (c *Transit) Config(ctx context.Context, keycfg *KeyConfig) (err error) {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -294,6 +316,10 @@ func (c *Transit) Restore(ctx context.Context, backup string) (err error) {
 	}
 	defer resp.Body.Close()
 
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -341,10 +367,14 @@ func (c *Transit) Delete(ctx context.Context) (err error) {
 	}
 	defer resp.Body.Close()
 
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-// Hmac
+// Hmac - Geneate HMAC
 // https://www.vaultproject.io/api-docs/secret/transit#generate-hmac
 func (c *Transit) Hmac(ctx context.Context, algo string, key_version int, input string) (text string, err error) {
 	if c.Key == "" {
@@ -458,6 +488,54 @@ func (c *Transit) CreateKey(ctx context.Context, keytype string) error {
 	}
 
 	return nil
+}
+
+// Export key.
+// https://www.vaultproject.io/api-docs/secret/transit#export-key
+func (c *Transit) Export(ctx context.Context, key_type ExportKeyType, key_version int) (string, error) {
+	if c.Key == "" {
+		return "", ErrNoKey
+	}
+
+	var ktype string
+	switch key_type {
+	case ExportEncryptionKey:
+		ktype = "encryption-key"
+	case ExportSigningKey:
+		ktype = "signing-key"
+	case ExportHMACKey:
+		ktype = "hmac-key"
+	default:
+		return "", ErrBadKey
+	}
+
+	if key_version < 0 {
+		return "", ErrBadKeyVersion
+	}
+
+	r := c.client.NewRequest("GET", "/v1/transit/export/"+ktype+"/"+c.Key)
+
+	if key_version > 0 {
+		r = c.client.NewRequest("GET", "/v1/transit/export/"+ktype+"/"+c.Key+"/"+strconv.Itoa(key_version))
+	}
+
+	resp, err := c.client.RawRequestWithContext(ctx, r)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	reply := &api.Secret{}
+	if err := jsonutil.DecodeJSONFromReader(resp.Body, reply); err != nil {
+		return "", err
+	}
+
+	out := &KeyInfo{}
+	if err := mapstructure.Decode(reply.Data, out); err != nil {
+		return "", err
+	}
+
+	return out.Keys.Num1.(string), nil
 }
 
 // NewTransitClient - Generate new transit client.
