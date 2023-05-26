@@ -1,25 +1,38 @@
 package vaultlib
 
-import "os"
-
-type Config struct {
+type config struct {
 	Address   string
 	Token     string
 	NameSpace string
+	Key       string
 }
 
-func NewConfig() *Config {
-	var cfg Config
+type ConfOptions func(*config)
 
-	if v := os.Getenv("VAULT_TOKEN"); v != "" {
-		cfg.Token = v
-	}
-	if v := os.Getenv("VAULT_ADDR"); v != "" {
-		cfg.Address = v
-	}
-	if v := os.Getenv("VAULT_NAMESPACE"); v != "" {
-		cfg.NameSpace = v
-	}
+func newConfig() *config {
+	return &config{}
+}
 
-	return &cfg
+func WithToken(t string) ConfOptions {
+	return func(c *config) {
+		c.Token = t
+	}
+}
+
+func WithAddress(a string) ConfOptions {
+	return func(c *config) {
+		c.Address = a
+	}
+}
+
+func WithNameSpace(n string) ConfOptions {
+	return func(c *config) {
+		c.Address = n
+	}
+}
+
+func WithKey(k string) ConfOptions {
+	return func(c *config) {
+		c.Key = k
+	}
 }

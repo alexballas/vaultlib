@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
 	"strconv"
 
 	"github.com/hashicorp/vault/api"
@@ -539,14 +540,35 @@ func (c *Transit) Export(ctx context.Context, key_type ExportKeyType, key_versio
 }
 
 // NewTransitClient - Generate new transit client.
-func NewTransitClient(c *Config, key string) (*Transit, error) {
+func NewTransitClient(opts ...ConfOptions) (*Transit, error) {
+	c := newConfig()
+	for _, o := range opts {
+		o(c)
+	}
+
+	if c.Token == "" {
+		c.Token = os.Getenv("VAULT_TOKEN")
+	}
+
+	if c.Address == "" {
+		c.Address = os.Getenv("VAULT_ADDR")
+	}
+
+	if c.NameSpace == "" {
+		c.NameSpace = os.Getenv("VAULT_NAMESPACE")
+	}
+
+	if c.Key == "" {
+		return nil, ErrNoKey
+	}
+
 	newclient, err := c.newclient()
 	if err != nil {
 		return nil, err
 	}
 
 	return &Transit{
-		Key:    key,
+		Key:    c.Key,
 		client: newclient,
 	}, nil
 }

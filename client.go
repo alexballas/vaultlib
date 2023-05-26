@@ -6,7 +6,7 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
-func (c *Config) newclient() (*api.Client, error) {
+func (c *config) newclient() (*api.Client, error) {
 	if c.Address == "" {
 		return nil, errors.New("no vault address provided")
 	}

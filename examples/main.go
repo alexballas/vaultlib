@@ -12,9 +12,7 @@ func main() {
 
 	ctx := context.Background()
 
-	vaultcfg := vaultlib.NewConfig()
-
-	transitclient, err := vaultlib.NewTransitClient(vaultcfg, "my-key")
+	transitclient, err := vaultlib.NewTransitClient(vaultlib.WithKey("my-key"))
 	check(err)
 
 	err = transitclient.CreateKey(ctx, "")
